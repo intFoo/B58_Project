@@ -82,6 +82,7 @@ module project
     // Instansiate FSM control
 	control c0(.level(level), .select(SW[2:0]), .clk(CLOCK_50), .resetn(resetn), .go(KEY[2]), .draw(draw), .plot(writeEn), .levelout(level));
 
+    // use hex decoder to show score and select on hex display
     hex_decoder H0(
         .hex_digit(score[3:0]), 
         .segments(HEX0)
@@ -116,6 +117,7 @@ module datapath(
 	reg [2:0] box1, box2, box3, box4, box5, box6, black, res, c;
 	reg [6:0] score, x, y, box1_x, box1_y, box2_x, box2_y, box3_x, box3_y, box4_x, box4_y, box5_x, box5_y, box6_x, box6_y;
 
+	//different combination of colour of boxes based on the value of level
 	always@(posedge clk) 
 	begin: LVL
 		case(level)
@@ -284,10 +286,12 @@ module datapath(
 		endcase
 	end
 
-
+	// increase the score if the selected box has same colour as the box selected previously
 	always @(negedge set)
 	begin: SCORE_ALU
 		case (select)
+
+			// if box 1 is selected compare box 1 with the previous box selected
 			3'd1:begin
 				if (res == box1) begin
 					score <= inscore + 1'b1;
@@ -323,7 +327,8 @@ module datapath(
 			end
 		endcase
 	end
-		
+	
+	//store the selected box into register res for future comparison
 	always @(posedge set)
 	begin: ALU
 		case (select)
@@ -351,9 +356,11 @@ module datapath(
 		endcase
 	end
 	
+	//set the x,y cooridinate and colour a box based on the input of draw, when plot is 1 the box will be drawn
 	always @(*)
 	begin: DRAW
 		case (draw)
+			//If draw is 1 set x,y as cooridinate and colour of box1
 			4'd1: begin
 				x = box1_x;
 				y = box1_y;
@@ -422,6 +429,7 @@ module datapath(
 		endcase
 	end
 
+	//Output the score
 	always@(posedge go) begin
 		if(!resetn) begin
 			res_score <= 7'b0;
@@ -431,6 +439,7 @@ module datapath(
 		end
 	end
 
+	//Output the cooridinates and colour of box
 	always@(posedge clk) begin
 		if(!resetn) begin
 			x_out <= 7'b0;
@@ -527,8 +536,11 @@ module control(
 	always@(*)
 	begin: state_table
 		case (current_state)
+			//Wait for go signal and resets level if level reaches 5
 			SET: next_state = go ? SET_WAIT : SET;
 			SET_WAIT: next_state = go ? SET_WAIT : DRAW1;
+
+			//Show all 6 boxes
 			DRAW1: next_state = PLOT1;
 			PLOT1: next_state = DRAW2;
 			DRAW2: next_state = PLOT2;
@@ -543,6 +555,8 @@ module control(
 			PLOT6: next_state = WAIT;
 			WAIT: next_state = go ? WAIT_WAIT : WAIT;
 			WAIT_WAIT: next_state = go ? WAIT_WAIT : HIDE1;
+
+			//Hide all boxes
 			HIDE1: next_state = PLOT_H1;
 			PLOT_H1: next_state = HIDE2;
 			HIDE2: next_state = PLOT_H2;
@@ -557,6 +571,8 @@ module control(
 			PLOT_H6: next_state = HIDE_WAIT;
 			HIDE_WAIT: next_state = go ? HIDE_WAIT_W : HIDE_WAIT;
 			HIDE_WAIT_W: next_state = go ? HIDE_WAIT_W : SHOW1;
+
+			//Show selected box
 			SHOW1: next_state = go ? SHOW1_WAIT : SHOW1;
 			SHOW1_WAIT: next_state = go ? SHOW1_WAIT : SHOW2;
 			SHOW2: next_state = go ? SHOW2_WAIT : SHOW2;
@@ -569,6 +585,8 @@ module control(
 			SHOW5_WAIT: next_state = go ? SHOW5_WAIT : SHOW6;
 			SHOW6: next_state = go ? SHOW6_WAIT : SHOW6;
 			SHOW6_WAIT: next_state = go ? SHOW6_WAIT : CLEAR1;
+
+			//Clear screen
 			CLEAR1: next_state = P_CLEAR1;
 			P_CLEAR1: next_state = CLEAR2;
 			CLEAR2: next_state = P_CLEAR2;
@@ -581,6 +599,8 @@ module control(
 			P_CLEAR5: next_state = CLEAR6;
 			CLEAR6: next_state = P_CLEAR6;
 			P_CLEAR6: next_state = END;
+
+			//Go back to first state and increment level by 1
 			END: next_state = go ? END_WAIT : END;
 			END_WAIT: next_state = go ? END_WAIT : SET;
 		default:	next_state = SET;
@@ -599,6 +619,8 @@ module control(
 					levelout <= 3'b000;
 				end
 			end
+
+			//Draw the boxes
 			PLOT1:begin
 				plot = 1'b1;
 			      end
@@ -654,7 +676,8 @@ module control(
 			SHOW6_WAIT:begin
 				plot = 1'b1;
 			      end
-					
+				
+			//set the coordinate and colour of a box	
 			DRAW1: begin
 				draw = 4'd1;
 				end
@@ -674,6 +697,7 @@ module control(
 				draw = 4'd6;
 				end
 				
+			//replace a box with the colour black
 			CLEAR1: begin
 				draw = 4'd7;
 				end
@@ -729,6 +753,8 @@ module control(
 			HIDE6: begin
 				draw = 4'd12;
 				end
+
+			//Show selected box
 			SHOW1: begin
 				if(select == 3'd1)
 					draw = 4'd1;
@@ -813,6 +839,8 @@ module control(
 				if(select == 3'd6)
 					draw = 4'd6;
 			end
+
+
 			END: begin
 				levelout <= level + 3'b001;
 			end
